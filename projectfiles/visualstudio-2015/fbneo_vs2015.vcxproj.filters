@@ -2325,6 +2325,9 @@
     <ClCompile Include="..\..\src\burner\win32\inpdipsw.cpp">
       <Filter>burner\win32</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\burner\win32\inpo.cpp">
+      <Filter>burner\win32</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\burner\win32\inps.cpp">
       <Filter>burner\win32</Filter>
     </ClCompile>

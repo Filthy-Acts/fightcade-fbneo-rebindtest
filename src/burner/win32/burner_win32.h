@@ -397,6 +397,40 @@ extern unsigned int nInpsInput;						// The input number we are redefining
 int InpsCreate();
 int InpsUpdate();
 
+// inpo.cpp - in-game control binding overlay (hold Start + Select/Coin for 5 seconds)
+#define INPO_MAX_ITEMS		32
+#define INPO_TEXT_LEN		48
+
+enum {
+	INPO_PHASE_CLOSED = 0,
+	INPO_PHASE_BIND,			// walking through P1 then P2 inputs
+	INPO_PHASE_REVIEW,			// all inputs visited, waiting for save / redo / discard
+	INPO_PHASE_CLOSING,			// waiting for every control to be released before resuming
+};
+
+struct InpoView {
+	int nPhase;											// INPO_PHASE_*
+	int nPlayer;										// player currently being bound (0 / 1)
+	int nOnlyPlayer;									// player redoing their set alone (0 / 1), -1 = both
+	int nItem;											// item currently being bound
+	int bWaitingRelease;								// waiting for controls to be released before listening
+	int nCount[2];										// number of bindable inputs per player
+	wchar_t szName[2][INPO_MAX_ITEMS][INPO_TEXT_LEN];	// input names ("Up", "Weak Punch", ...)
+	wchar_t szBind[2][INPO_MAX_ITEMS][INPO_TEXT_LEN];	// current binding descriptions
+	wchar_t szPressed[INPO_TEXT_LEN];					// control currently held down (if any)
+	float fHoldProgress;								// 0..1 progress of a "hold to skip / redo" gesture
+	int bSaveChord;										// review screen: Start + Select is being pressed (release saves)
+	int nHoldTarget;									// review screen: whose set the held control redoes (0 / 1, -1 = both)
+	float fOpenProgress;								// 0..1 progress of the Start + Select open gesture
+	wchar_t szToast[96];								// short status message ("Controls saved", ...), empty if none
+};
+
+void InpoUpdate();										// called from GetInput() every input poll
+bool InpoIsActive();									// true while the overlay owns the inputs (emulation paused)
+bool InpoSwallowMessage(const MSG* pMsg);				// true if a window message must not reach the emulator
+const InpoView* InpoGetView();							// snapshot for the renderer (vid_overlay.cpp)
+void InpoClose(bool bSave);
+
 // inpc.cpp
 extern HWND hInpcDlg;								// Handle to the Input Constant Dialog
 extern unsigned int nInpcInput;						// The input number we are redefining

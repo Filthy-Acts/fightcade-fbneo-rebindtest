@@ -25,6 +25,7 @@ void VidOverlaySaveFiles(bool save_info, bool save_scores, bool save_characters,
 void VidOverlaySaveInfo();
 void VidOverlaySaveChatHistory(const wchar_t *text);
 bool VidOverlayCanReset();
+bool VidOverlayIsReady();			// true when the D3D overlay can draw (DirectX9 / DirectX9 Alt)
 
 void VidDebug(const wchar_t *text, float a, float b);
 void VidDisplayInputs(int slot, int state);

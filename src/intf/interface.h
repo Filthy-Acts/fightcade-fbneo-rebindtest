@@ -47,6 +47,7 @@ INT32 InputExit();
 INT32 InputSetCooperativeLevel(const bool bExclusive, const bool bForeGround);
 INT32 InputMake(bool bCopy);
 INT32 InputFind(const INT32 nFlags);
+INT32 InputReadSwitch(const INT32 nCode);
 INT32 InputGetControlName(INT32 nCode, TCHAR* pszDeviceName, TCHAR* pszControlName);
 InterfaceInfo* InputGetInfo();
 std::vector<const InputInOut *> InputGetInterfaces();
