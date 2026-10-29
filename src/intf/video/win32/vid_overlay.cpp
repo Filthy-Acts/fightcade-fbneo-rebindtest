@@ -960,6 +960,7 @@ static Text stats_line3;
 static Text info;
 static Text volume;
 static Text warning;
+static IDirect3DTexture9 *white_tex = NULL;		// 4x4 white texture for solid rectangles
 
 void InputRender(float &x, float &y, int idx)
 {
@@ -986,6 +987,18 @@ void VidOverlayInit(IDirect3DDevice9Ex *device)
 		badges_spr[i].Init(temp, &renderer);
 	}
 	DeleteFileA("fightcade/started.inf");
+
+	// solid white texture used to draw plain rectangles (control binding overlay)
+	pD3DDevice->CreateTexture(4, 4, 1, D3DUSAGE_DYNAMIC, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &white_tex, 0);
+	if (white_tex) {
+		D3DLOCKED_RECT rect;
+		if (SUCCEEDED(white_tex->LockRect(0, &rect, 0, D3DLOCK_DISCARD))) {
+			for (int y = 0; y < 4; y++) {
+				memset((unsigned char *)rect.pBits + y * rect.Pitch, 0xFF, 4 * 4);
+			}
+			white_tex->UnlockRect(0);
+		}
+	}
 
 #ifdef TEST_OVERLAY
 	VidOverlaySetGameInfo(_T("Bender#2,10"), _T("Iori#3,8"), false, 10, 0);
@@ -1015,7 +1028,13 @@ void VidOverlayEnd()
 	for (int i = 0; i < NUM_RANKS; i++) {
 		badges_spr[i].End();
 	}
+	RELEASE(white_tex);
 	pD3DDevice = NULL;
+}
+
+bool VidOverlayIsReady()
+{
+	return pD3DDevice != NULL && font.IsOk();
 }
 
 void VidOverlayQuit()
@@ -1037,6 +1056,205 @@ void VidOverlaySetSize(const RECT &dest, float size)
 	}
 	frame_width = 1.f;
 	frame_height = frame_width * (dest.bottom - dest.top) / (dest.right - dest.left);
+}
+
+//------------------------------------------------------------------------------------------------------------------------------
+// control binding overlay (state lives in burner/win32/inpo.cpp)
+//------------------------------------------------------------------------------------------------------------------------------
+static void DrawRect(float x, float y, float w, float h, unsigned int color)
+{
+	if (!white_tex || w <= 0.f || h <= 0.f) {
+		return;
+	}
+	float s = (float)(frame_dest.right - frame_dest.left);
+	float px = FPX(x);
+	float py = FPY(y);
+	float pw = w * s;
+	float ph = h * s;
+
+	renderer.SetTexture(white_tex);
+	renderer.VtxColor(color);
+	renderer.VtxTexCoord(0.5f, 0.5f);
+	renderer.VtxPos(px, py, 0);
+	renderer.VtxPos(px + pw, py, 0);
+	renderer.VtxPos(px + pw, py + ph, 0);
+	renderer.VtxPos(px, py + ph, 0);
+}
+
+static void DrawBar(float x, float y, float w, float h, float progress, unsigned int color)
+{
+	DrawRect(x, y, w, h, 0x50FFFFFF);
+	DrawRect(x, y, w * MAX(0.f, MIN(1.f, progress)), h, color);
+}
+
+static void RenderInputSetup()
+{
+	const InpoView *v = InpoGetView();
+	if (!v) {
+		return;
+	}
+
+	const unsigned int COL_WHITE  = 0xFFFFFFFF;
+	const unsigned int COL_DIM    = 0xFF8C8C8C;
+	const unsigned int COL_ACCENT = 0xFF33F1E5;		// same cyan as the scores
+	const unsigned int COL_ACTIVE = 0xFFFFB200;		// same amber as the FTx label
+	const unsigned int COL_UNSET  = 0xFFFF6A6A;
+
+	const float lh = FNT_MED * FNT_SEP;				// one text line at FNT_MED
+	const bool blink = (timeGetTime() % 800) < 500;
+
+	// short status message ("Controls saved", ...)
+	if (v->szToast[0]) {
+		float tw = fontGetTextWidth(v->szToast, FNT_MED) + 0.04f;
+		float ty = frame_height * 0.12f;
+		DrawRect(0.5f - tw * 0.5f, ty, tw, lh * 1.5f, 0xD0000000);
+		fontWrite(v->szToast, 0.5f, ty + lh * 0.25f, COL_WHITE, 1.f, FNT_MED, FONT_ALIGN_CENTER);
+	}
+
+	if (v->nPhase == INPO_PHASE_CLOSED) {
+		// Start + Select is being held: show how long is left
+		if (v->fOpenProgress > 0.f) {
+			const wchar_t *text = _T("Keep holding Start + Select to change controls");
+			float bw = MAX(0.46f, fontGetTextWidth(text, FNT_MED) + 0.05f);
+			float bx = 0.5f - bw * 0.5f;
+			float by = frame_height * 0.12f;
+			DrawRect(bx, by, bw, lh * 2.6f, 0xD0000000);
+			fontWrite(text, 0.5f, by + lh * 0.3f, COL_WHITE, 1.f, FNT_MED, FONT_ALIGN_CENTER);
+			DrawBar(bx + 0.025f, by + lh * 1.75f, bw - 0.05f, lh * 0.4f, v->fOpenProgress, COL_ACCENT);
+		}
+		return;
+	}
+
+	// dim the (paused) game
+	DrawRect(0.f, 0.f, frame_width, frame_height, 0xC8000000);
+
+	// title + instruction
+	float y = frame_height * 0.04f;
+	fontWrite(_T("CONTROLS"), 0.5f, y, COL_WHITE, 1.f, FNT_MED * 1.6f, FONT_ALIGN_CENTER);
+	y += lh * 1.9f;
+
+	wchar_t line[160] = _T("");
+	unsigned int line_col = COL_ACTIVE;
+	switch (v->nPhase) {
+		case INPO_PHASE_BIND:
+			if (v->bWaitingRelease) {
+				swprintf(line, 160, _T("Release all controls..."));
+				line_col = COL_DIM;
+			} else {
+				swprintf(line, 160, _T("PLAYER %d:  press the control for  %s"), v->nPlayer + 1, v->szName[v->nPlayer][v->nItem]);
+			}
+			break;
+		case INPO_PHASE_REVIEW:
+			if (v->bSaveChord) {
+				swprintf(line, 160, _T("Release to save and resume"));
+			} else if (v->fHoldProgress > 0.f) {
+				if (v->nHoldTarget >= 0) {
+					swprintf(line, 160, _T("Keep holding to redo PLAYER %d's controls"), v->nHoldTarget + 1);
+				} else {
+					swprintf(line, 160, _T("Keep holding to redo BOTH players' controls"));
+				}
+			} else {
+				swprintf(line, 160, _T("All done!  Press Start + Select to save and resume"));
+			}
+			break;
+		case INPO_PHASE_CLOSING:
+			swprintf(line, 160, _T("Release all controls to resume..."));
+			line_col = COL_DIM;
+			break;
+	}
+	fontWrite(line, 0.5f, y, line_col, 1.f, FNT_MED, FONT_ALIGN_CENTER);
+	y += lh * 1.4f;
+
+	if (v->nPhase == INPO_PHASE_REVIEW && v->fHoldProgress > 0.f) {
+		DrawBar(0.3f, y, 0.4f, lh * 0.35f, v->fHoldProgress, COL_ACTIVE);
+	}
+	y += lh * 0.8f;
+
+	// columns
+	const int cols = (v->nCount[0] > 0 ? 1 : 0) + (v->nCount[1] > 0 ? 1 : 0);
+	const float margin = 0.04f;
+	const float gap = 0.03f;
+	const float colw = (cols == 2) ? (frame_width - margin * 2.f - gap) * 0.5f : 0.5f;
+	const float pad = 0.01f;
+	const int rows = MAX(v->nCount[0], v->nCount[1]);
+
+	// scale the list so it fits: vertically between the title and the footer, horizontally in a column
+	float scale = FNT_MED;
+	float avail = frame_height - y - lh * 3.2f;
+	float rowh = scale * FNT_SEP * 1.25f;
+	if ((rows + 1.6f) * rowh > avail && avail > 0.f) {
+		scale *= avail / ((rows + 1.6f) * rowh);
+	}
+	float widest = 0.f;
+	for (int p = 0; p < 2; p++) {
+		for (int i = 0; i < v->nCount[p]; i++) {
+			float bind = MAX(fontGetTextWidth(v->szBind[p][i], scale), fontGetTextWidth(_T("press a control"), scale));
+			widest = MAX(widest, fontGetTextWidth(v->szName[p][i], scale) + bind + 0.03f);
+		}
+	}
+	if (widest > colw - pad * 2.f) {
+		scale *= (colw - pad * 2.f) / widest;
+	}
+	scale = MAX(scale, FNT_SMA * 0.8f);
+	rowh = scale * FNT_SEP * 1.25f;
+
+	int col = 0;
+	for (int p = 0; p < 2; p++) {
+		if (v->nCount[p] == 0) {
+			continue;
+		}
+		const float x0 = (cols == 2) ? margin + col * (colw + gap) : 0.5f - colw * 0.5f;
+		const bool current_player = (v->nPhase == INPO_PHASE_BIND && v->nPlayer == p);
+		col++;
+
+		// panel + header
+		DrawRect(x0, y, colw, rowh * (v->nCount[p] + 1.6f) + pad, 0x90202028);
+		DrawRect(x0, y, colw, rowh * 1.3f, current_player ? 0xC0105058 : 0xC0303038);
+		fontWrite(p == 0 ? _T("PLAYER 1") : _T("PLAYER 2"), x0 + colw * 0.5f, y + rowh * 0.15f, current_player ? COL_ACCENT : COL_WHITE, 1.f, scale, FONT_ALIGN_CENTER);
+
+		for (int i = 0; i < v->nCount[p]; i++) {
+			const float ry = y + rowh * (1.6f + i);
+			const bool current = current_player && v->nItem == i;
+			const bool pending = (v->nPhase == INPO_PHASE_BIND) && ((p > v->nPlayer && v->nOnlyPlayer < 0) || (p == v->nPlayer && i > v->nItem));
+			const bool unset = !wcscmp(v->szBind[p][i], _T("-"));
+
+			if (current) {
+				DrawRect(x0, ry - rowh * 0.1f, colw, rowh, 0x7033F1E5);
+				if (v->fHoldProgress > 0.f) {
+					DrawBar(x0, ry + rowh * 0.78f, colw, rowh * 0.12f, v->fHoldProgress, COL_ACTIVE);
+				}
+			}
+
+			fontWrite(v->szName[p][i], x0 + pad, ry, current ? COL_WHITE : (pending ? COL_DIM : COL_WHITE), 1.f, scale, FONT_ALIGN_LEFT);
+
+			const wchar_t *bind = v->szBind[p][i];
+			unsigned int bind_col = unset ? COL_UNSET : (pending ? COL_DIM : 0xFFDDDDDD);
+			if (current) {
+				bind_col = COL_ACTIVE;
+				if (v->szPressed[0]) {
+					bind = v->szPressed;
+				} else if (!v->bWaitingRelease) {
+					bind = _T("press a control");
+					if (!blink) {
+						bind_col = COL_DIM;
+					}
+				}
+			}
+			fontWrite(bind, x0 + colw - pad, ry, bind_col, 1.f, scale, FONT_ALIGN_RIGHT);
+		}
+	}
+
+	// footer
+	const float fs = MAX(FNT_SMA * 1.3f, scale * 0.8f);
+	const float fl = fs * FNT_SEP;
+	float fy = frame_height - fl * 2.9f;
+	if (v->nPhase == INPO_PHASE_REVIEW) {
+		fontWrite(_T("Start + Select: save and resume     Hold one of YOUR controls 2s: redo your player"), 0.5f, fy, COL_WHITE, 1.f, fs, FONT_ALIGN_CENTER);
+		fontWrite(_T("Hold an unassigned control 2s: redo both players     Keyboard  Esc: discard changes"), 0.5f, fy + fl * 1.3f, COL_DIM, 1.f, fs, FONT_ALIGN_CENTER);
+	} else {
+		fontWrite(_T("Tap a control to assign it     Hold one for 1.5s to skip (keep current)"), 0.5f, fy, COL_WHITE, 1.f, fs, FONT_ALIGN_CENTER);
+		fontWrite(_T("Keyboard  Backspace: back     Delete: clear     Esc: cancel"), 0.5f, fy + fl * 1.3f, COL_DIM, 1.f, fs, FONT_ALIGN_CENTER);
+	}
 }
 
 void VidOverlayRender(const RECT &dest, int gameWidth, int gameHeight, int scan_intensity)
@@ -1289,6 +1507,8 @@ void VidOverlayRender(const RECT &dest, int gameWidth, int gameHeight, int scan_
 	}
 
 	gameDetector.Render();
+
+	RenderInputSetup();
 
 	renderer.EndRender();
 }

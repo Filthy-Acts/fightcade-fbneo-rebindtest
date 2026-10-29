@@ -369,6 +369,7 @@
     <ClCompile Include="..\..\src\burner\win32\inpcheat.cpp" />
     <ClCompile Include="..\..\src\burner\win32\inpd.cpp" />
     <ClCompile Include="..\..\src\burner\win32\inpdipsw.cpp" />
+    <ClCompile Include="..\..\src\burner\win32\inpo.cpp" />
     <ClCompile Include="..\..\src\burner\win32\inps.cpp" />
     <ClCompile Include="..\..\src\burner\win32\ips_manager.cpp" />
     <ClCompile Include="..\..\src\burner\win32\localise.cpp" />

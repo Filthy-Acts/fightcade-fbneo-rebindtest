@@ -72,6 +72,20 @@ std::vector<lua_hotkey_handler> hotkey_debounces = {
 
 static void CheckSystemMacros() // These are the Pause / FFWD macros added to the input dialog
 {
+	if (InpoIsActive()) {
+		// The control binding overlay owns the inputs: track the macro states so nothing fires
+		// while controls are being pressed for binding, or right after the overlay closes
+		prevPause = macroSystemPause;
+		prevLState = macroSystemLoadState;
+		prevSState = macroSystemSaveState;
+		prevUState = macroSystemUNDOState;
+		prevFrame = macroSystemFrame;
+		for (size_t n = 0; n < hotkey_debounces.size(); n++) {
+			hotkey_debounces[n].prev_value = *hotkey_debounces[n].macroSystemLuaHotkey_ref;
+		}
+		return;
+	}
+
 	// Pause
 	if (macroSystemPause && macroSystemPause != prevPause && timeGetTime() > prevPause_debounce+90) {
 		if (bHasFocus) {
@@ -156,6 +170,9 @@ static int GetInput(bool bCopy)
 
 	// Update Input Set dialog
 	InpsUpdate();
+
+	// In-game control binding overlay (opened by holding Start + Select)
+	InpoUpdate();
 	return 0;
 }
 
@@ -244,7 +261,7 @@ int RunFrame(int bDraw, int bPause, int bInput)
 		return 1;
 	}
 	
-	if (bPause && !bAppDoFast) {
+	if (bPause && (!bAppDoFast || InpoIsActive())) {
 		GetInput(false);						// Update burner inputs, but not game inputs
 	} else {
 		nFramesEmulated++;
@@ -397,8 +414,8 @@ int RunIdle()
 		nCount = 10;
 	}
 
-	if (bRunPause) {
-		if (bAppDoStep) {					  // Step one frame
+	if (bRunPause || InpoIsActive()) {	  // the control binding overlay pauses emulation too
+		if (bAppDoStep && !InpoIsActive()) {  // Step one frame
 			nCount = 0;
 		} else {
 			RunFrame(1, 1, 1);				// Paused
@@ -563,6 +580,10 @@ int RunMessageLoop()
 				{
 					MediaExit(true);
 					break;
+				}
+
+				if (InpoSwallowMessage(&Msg)) {											// Keyboard belongs to the control binding overlay
+					continue;
 				}
 
 				if (bMenuEnabled && nVidFullscreen == 0) {								// Handle keyboard messages for the menu

@@ -61,6 +61,17 @@ inline INT32 CinpState(const INT32 nCode)
 	return pInputInOut[nInputSelect]->ReadSwitch(nCode);
 }
 
+// Read the raw, current state of a single control code (keyboard / joystick / mouse).
+// Unlike GameInp[].Input.nVal this is never merged with previous frames, so it is safe
+// to use while emulation is paused (used by the in-game control binding overlay).
+INT32 InputReadSwitch(const INT32 nCode)
+{
+	if (!bInputOkay || nInputSelect >= INPUT_LEN || nCode <= 0) {
+		return 0;
+	}
+	return CinpState(nCode);
+}
+
 // Read an axis of a joystick
 inline INT32 CinpJoyAxis(const INT32 i, const INT32 nAxis)
 {
