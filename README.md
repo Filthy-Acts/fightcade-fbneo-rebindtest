@@ -1,3 +1,15 @@
+## Fightcade-fbneo with Controller Rebinds In-Game (AI Generated)
+Additions to this fork were assisted by Claude, i apologize if this causes any frustration.
+
+This is intended for offline use only, and not to be used for Fightcade Online.
+
+These changes aim to improve adjusting your controls in FBNeo by implementing an overlay menu that allows both Player 1 and Player 2 to bind their controls (Player 1 first, then Player 2) and return to the game once completed. This should hopefully remove any reliance on mouse and keyboard for general play (but should still be considered for additional keybinding setup such as Reset/Diagnostics).
+
+Holding Start+Select will notify you that you are about to launch the overlay, Player 1 or 2 can hold a button for two seconds to complete their bindings again, and pressing Start+Select will close the overlay.
+
+![image](https://github.com/Filthy-Acts/fightcade-fbneo-rebindtest/blob/master/example.png)
+
+## 
 ## Fightcade-fbneo
 Fightcade emulator built with FBNeo and GGPO
 Public Release: https://www.fightcade.com
