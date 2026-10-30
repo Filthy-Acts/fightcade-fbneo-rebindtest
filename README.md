@@ -9,6 +9,24 @@ Holding Start+Select will notify you that you are about to launch the overlay, P
 
 ![image](https://github.com/Filthy-Acts/fightcade-fbneo-rebindtest/blob/master/example.png)
 
+## Installation Instructions
+Similar to the instructions below, but you will also need to copy the "ui" folder from your FightCade FBNeo installation location to the folder where you would like to run this version.
+
+Simple Overall Instructions:
+
+1: Install FightCade
+
+2: Test that the standard FBNeo works with your legally acquired dump of your game of choice
+
+3: In your FightCade install location, go to /emulator/fbneo and copy the entire folder to a new location
+
+4: Download the binary from releases (Windows only at the moment)
+
+5: Replace the fcadefbneo.exe file with the one from this repo
+
+6: Run the executable and load your game through Game > Load Game
+
+
 ## 
 ## Fightcade-fbneo
 Fightcade emulator built with FBNeo and GGPO
