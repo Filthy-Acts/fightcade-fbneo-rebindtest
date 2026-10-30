@@ -12,7 +12,7 @@ Holding Start+Select will notify you that you are about to launch the overlay, P
 ## Installation Instructions
 Similar to the instructions below, but you will also need to copy the "ui" folder from your FightCade FBNeo installation location to the folder where you would like to run this version.
 
-Simple Overall Instructions:
+**Simple Overall Instructions:**
 
 1: Install FightCade
 
